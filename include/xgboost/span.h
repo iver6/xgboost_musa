@@ -102,6 +102,33 @@ namespace xgboost::common {
 
 #define SPAN_CHECK KERNEL_CHECK
 
+#elif defined(__MUSA_ARCH__)
+// Usual logging facility is not available inside device code.
+
+#if defined(_MSC_VER)
+
+// Windows CUDA doesn't have __assert_fail.
+#define MUSA_KERNEL_CHECK(cond)           \
+  do {                                    \
+    if (XGBOOST_EXPECT(!(cond), false)) { \
+      asm("trap;");                       \
+    }                                     \
+  } while (0)
+
+#else  // defined(_MSC_VER)
+
+#define __ASSERT_STR_HELPER(x) #x
+
+#define MUSA_KERNEL_CHECK(cond) \
+  (XGBOOST_EXPECT((cond), true) \
+       ? static_cast<void>(0)   \
+       : __assert_fail(__ASSERT_STR_HELPER((cond)), __FILE__, __LINE__, __PRETTY_FUNCTION__))
+
+#endif  // defined(_MSC_VER)
+
+#define KERNEL_CHECK MUSA_KERNEL_CHECK
+
+#define SPAN_CHECK KERNEL_CHECK
 #else  // ------------------------------ not CUDA ----------------------------
 
 #if defined(XGBOOST_STRICT_R_MODE) && XGBOOST_STRICT_R_MODE == 1

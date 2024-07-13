@@ -69,7 +69,7 @@ __device__ __forceinline__ double atomicAdd(double* address, double val) {  // N
 namespace dh {
 
 // FIXME(jiamingy): Remove this once we get rid of cub submodule.
-constexpr bool BuildWithCUDACub() {
+constexpr bool BuildWithMUSACub() {
 #if defined(THRUST_IGNORE_CUB_VERSION_CHECK) && THRUST_IGNORE_CUB_VERSION_CHECK == 1
   return false;
 #else
@@ -1039,7 +1039,7 @@ void InclusiveSum(InputIteratorT d_in, OutputIteratorT d_out, OffsetT num_items)
   InclusiveScan(d_in, d_out, cub::Sum(), num_items);
 }
 
-class CUDAStreamView;
+class MUSAStreamView;
 
 class CUDAEvent {
   musaEvent_t event_{nullptr};
@@ -1055,16 +1055,16 @@ class CUDAEvent {
   CUDAEvent(CUDAEvent const &that) = delete;
   CUDAEvent &operator=(CUDAEvent const &that) = delete;
 
-  inline void Record(CUDAStreamView stream);       // NOLINT
+  inline void Record(MUSAStreamView stream);       // NOLINT
 
   operator musaEvent_t() const { return event_; }  // NOLINT
 };
 
-class CUDAStreamView {
+class MUSAStreamView {
   musaStream_t stream_{nullptr};
 
  public:
-  explicit CUDAStreamView(musaStream_t s) : stream_{s} {}
+  explicit MUSAStreamView(musaStream_t s) : stream_{s} {}
   void Wait(CUDAEvent const &e) {
 #if defined(__CUDACC_VER_MAJOR__)
 #if __CUDACC_VER_MAJOR__ == 11 && __CUDACC_VER_MINOR__ == 0
@@ -1090,28 +1090,28 @@ class CUDAStreamView {
   }
 };
 
-inline void CUDAEvent::Record(CUDAStreamView stream) {  // NOLINT
+inline void CUDAEvent::Record(MUSAStreamView stream) {  // NOLINT
   dh::safe_cuda(musaEventRecord(event_, musaStream_t{stream}));
 }
 
 // Changing this has effect on prediction return, where we need to pass the pointer to
 // third-party libraries like cuPy
-inline CUDAStreamView DefaultStream() {
+inline MUSAStreamView DefaultStream() {
 #ifdef MUSA_API_PER_THREAD_DEFAULT_STREAM
-  return CUDAStreamView{musaStreamPerThread};
+  return MUSAStreamView{musaStreamPerThread};
 #else
-  return CUDAStreamView{musaStreamLegacy};
+  return MUSAStreamView{musaStreamLegacy};
 #endif
 }
 
-class CUDAStream {
+class MUSAStream {
   musaStream_t stream_;
 
  public:
-  CUDAStream() { dh::safe_cuda(musaStreamCreateWithFlags(&stream_, musaStreamNonBlocking)); }
-  ~CUDAStream() { dh::safe_cuda(musaStreamDestroy(stream_)); }
+  MUSAStream() { dh::safe_cuda(musaStreamCreateWithFlags(&stream_, musaStreamNonBlocking)); }
+  ~MUSAStream() { dh::safe_cuda(musaStreamDestroy(stream_)); }
 
-  [[nodiscard]] CUDAStreamView View() const { return CUDAStreamView{stream_}; }
+  [[nodiscard]] MUSAStreamView View() const { return MUSAStreamView{stream_}; }
   [[nodiscard]] musaStream_t Handle() const { return stream_; }
 
   void Sync() { this->View().Sync(); }
