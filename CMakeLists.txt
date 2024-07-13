@@ -75,6 +75,8 @@ option(KEEP_BUILD_ARTIFACTS_IN_BINARY_DIR "Output build artifacts in CMake binar
 option(USE_CUDA  "Build with GPU acceleration" OFF)
 option(USE_PER_THREAD_DEFAULT_STREAM "Build with per-thread default stream" ON)
 option(USE_NCCL  "Build with NCCL to enable distributed GPU support." OFF)
+## MUSA
+option(USE_MUSA "Build with MUSA acceleration" ON)
 # This is specifically designed for PyPI binary release and should be disabled for most of the cases.
 option(USE_DLOPEN_NCCL "Whether to load nccl dynamically." OFF)
 option(BUILD_WITH_SHARED_NCCL "Build with shared NCCL library." OFF)
@@ -200,6 +202,14 @@ if(USE_SANITIZER)
   enable_sanitizers("${ENABLED_SANITIZERS}")
 endif()
 
+if(USE_MUSA)
+  #enable_language(CUDA)
+  list(APPEND CMAKE_MODULE_PATH /usr/local/musa/cmake) 
+  #find_package(MUSAToolkit REQUIRED)
+  find_package(MUSA REQUIRED)
+  #enable_language(MUSA)
+endif()
+
 if(USE_CUDA)
   set(USE_OPENMP ON CACHE BOOL "CUDA requires OpenMP" FORCE)
   # `export CXX=' is ignored by CMake CUDA.
@@ -280,6 +290,11 @@ endif()
 # core xgboost
 add_subdirectory(${xgboost_SOURCE_DIR}/src)
 target_link_libraries(objxgboost PUBLIC dmlc)
+
+if(USE_MUSA)
+  #set(MUSA_LINK_LIBRARIES_KEYWORD PRIVATE)
+  target_link_libraries(objxgboost PUBLIC musa_obj)
+endif()
 
 # Link -lstdc++fs for GCC 8.x
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS "9.0")

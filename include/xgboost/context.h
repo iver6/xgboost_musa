@@ -17,6 +17,7 @@
 namespace xgboost {
 
 struct CUDAContext;
+struct MUSAContext;
 
 // symbolic names
 struct DeviceSym {
@@ -219,6 +220,8 @@ struct Context : public XGBoostParameter<Context> {
    */
   [[nodiscard]] CUDAContext const* CUDACtx() const;
 
+  [[nodiscard]] MUSAContext const* MUSACtx() const;
+
   /**
    * @brief Make a CUDA context based on the current context.
    *
@@ -307,6 +310,9 @@ struct Context : public XGBoostParameter<Context> {
   // shared_ptr is used instead of unique_ptr as with unique_ptr it's difficult to define
   // p_impl while trying to hide CUDA code from the host compiler.
   mutable std::shared_ptr<CUDAContext> cuctx_;
+
+
+  mutable std::shared_ptr<MUSAContext> muctx_;
   // cached value for CFS CPU limit. (used in containerized env)
   std::int32_t cfs_cpu_count_;  // NOLINT
 };

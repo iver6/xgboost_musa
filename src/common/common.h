@@ -18,6 +18,7 @@
 
 #include "xgboost/base.h"     // for XGBOOST_DEVICE
 #include "xgboost/logging.h"  // for LOG, LOG_FATAL, LogMessageFatal
+//#define __MUSACC__
 
 #if defined(__CUDACC__)
 #include <thrust/system/cuda/error.h>
@@ -30,6 +31,19 @@
 #define WITH_CUDA() false
 
 #endif  // defined(__CUDACC__)
+
+#if defined(__MUSACC__)
+#include <thrust/system/musa/error.h>
+#include <thrust/system_error.h>
+
+#define WITH_MUSA() true
+
+#else
+
+#define WITH_MUSA() false
+
+#endif  // defined(__CUDACC__)
+
 
 namespace dh {
 #if defined(__CUDACC__)
@@ -48,6 +62,24 @@ inline cudaError_t ThrowOnCudaError(cudaError_t code, const char *file,
   return code;
 }
 #endif  // defined(__CUDACC__)
+
+#if defined(__MUSACC__)
+/*
+ * Error handling  functions
+ */
+#define safe_cuda(ans) ThrowOnCudaError((ans), __FILE__, __LINE__)
+
+inline musaError_t ThrowOnCudaError(musaError_t code, const char *file,
+                                    int line) {
+  if (code != musaSuccess) {
+    LOG(FATAL) << thrust::system_error(code, thrust::cuda_category(),
+                                       std::string{file} + ": " +  // NOLINT
+                                       std::to_string(line)).what();
+  }
+  return code;
+}
+#endif  // defined(__MUSACC__)
+
 }  // namespace dh
 
 namespace xgboost::common {
@@ -189,7 +221,7 @@ inline void AssertSYCLSupport() {
 
 void SetDevice(std::int32_t device);
 
-#if !defined(XGBOOST_USE_CUDA)
+#if  !defined(XGBOOST_USE_MUSA)
 inline void SetDevice(std::int32_t device) {
   if (device >= 0) {
     AssertGPUSupport();

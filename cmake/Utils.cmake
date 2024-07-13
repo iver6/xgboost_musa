@@ -242,6 +242,11 @@ macro(xgboost_target_link_libraries target)
     target_link_libraries(${target} PUBLIC CUDA::cudart_static)
   endif()
 
+  if(USE_MUSA)
+    target_compile_definitions(${target} PRIVATE -DXGBOOST_USE_MUSA=1)
+    message(STATUS "message in xgboost_target_link_libraries : ${target}")
+  endif()
+
   if(PLUGIN_RMM)
     target_link_libraries(${target} PRIVATE rmm::rmm)
   endif()

@@ -16,6 +16,27 @@ if(USE_CUDA)
   target_sources(objxgboost PRIVATE ${CUDA_SOURCES})
 endif()
 
+if(USE_MUSA)
+
+  list(APPEND CMAKE_MODULE_PATH /usr/local/musa/cmake) 
+  
+  find_package(MUSA REQUIRED)
+
+  file(GLOB_RECURSE MUSA_SOURCES *.mu *.muh)
+
+  set(MUSA_VERBOSE_BUILD ON)
+  set(MUSA_MCC_FLAGS --offload-arch=mp_21 -Werror -D__MUSACC__ -std=c++17 -DXGBOOST_USE_MUSA=1)
+  musa_include_directories(${xgboost_SOURCE_DIR}/include)
+  musa_include_directories(${xgboost_SOURCE_DIR}/dmlc-core/include)
+
+  musa_add_library(musa_obj STATIC ${MUSA_SOURCES})
+
+  #musa_compile(MUSA_OBJ ${MUSA_SOURCES})
+  #target_link_libraries(objxgboost PRIVATE ${MUSA_OBJ})
+  #target_sources(objxgboost PRIVATE ${MUSA_SOURCES})
+  #message(STATUS "MUSA_OBJ is ${MUSA_OBJ}")
+endif()
+
 if(PLUGIN_SYCL)
   target_compile_definitions(objxgboost PRIVATE -DXGBOOST_USE_SYCL=1)
 endif()
@@ -33,5 +54,6 @@ endif()
 # This grouping organises source files nicely in visual studio
 auto_source_group("${CUDA_SOURCES}")
 auto_source_group("${CPU_SOURCES}")
+#auto_source_group("${MUSA_SOURCES}")
 
 #-- End object library
