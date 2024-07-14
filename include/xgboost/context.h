@@ -23,6 +23,7 @@ struct MUSAContext;
 struct DeviceSym {
   static auto constexpr CPU() { return "cpu"; }
   static auto constexpr CUDA() { return "cuda"; }
+  static auto constexpr MUSA() { return "musa"; }
   static auto constexpr SyclDefault() { return "sycl"; }
   static auto constexpr SyclCPU() { return "sycl:cpu"; }
   static auto constexpr SyclGPU() { return "sycl:gpu"; }
@@ -38,11 +39,12 @@ struct DeviceOrd {
   static bst_d_ordinal_t constexpr InvalidOrdinal() { return -2; }
 
   enum Type : std::int16_t { kCPU = 0, kCUDA = 1,
-                             kSyclDefault = 2, kSyclCPU = 3, kSyclGPU = 4} device{kCPU};
+                             kSyclDefault = 2, kSyclCPU = 3, kSyclGPU = 4,kMUSA = 5} device{kCPU};
   // CUDA or Sycl device ordinal.
   bst_d_ordinal_t ordinal{CPUOrdinal()};
 
   [[nodiscard]] bool IsCUDA() const { return device == kCUDA; }
+  [[nodiscard]] bool IsMUSA() const { return device == kMUSA; }
   [[nodiscard]] bool IsCPU() const { return device == kCPU; }
   [[nodiscard]] bool IsSyclDefault() const { return device == kSyclDefault; }
   [[nodiscard]] bool IsSyclCPU() const { return device == kSyclCPU; }
@@ -70,6 +72,14 @@ struct DeviceOrd {
    */
   [[nodiscard]] static constexpr auto CUDA(bst_d_ordinal_t ordinal) {
     return DeviceOrd{kCUDA, ordinal};
+  }
+    /**
+   * @brief Constructor for MUSA device.
+   *
+   * @param ordinal MUSA device ordinal.
+   */
+  [[nodiscard]] static constexpr auto MUSA(bst_d_ordinal_t ordinal) {
+    return DeviceOrd{kMUSA, ordinal};
   }
   /**
    * @brief Constructor for SYCL.
@@ -110,6 +120,8 @@ struct DeviceOrd {
         return DeviceSym::CPU();
       case DeviceOrd::kCUDA:
         return DeviceSym::CUDA() + (':' + std::to_string(ordinal));
+      case DeviceOrd::kMUSA:
+        return DeviceSym::MUSA() + (':' + std::to_string(ordinal));
       case DeviceOrd::kSyclDefault:
         return DeviceSym::SyclDefault() + (':' + std::to_string(ordinal));
       case DeviceOrd::kSyclCPU:
@@ -185,6 +197,10 @@ struct Context : public XGBoostParameter<Context> {
    */
   [[nodiscard]] bool IsCUDA() const { return Device().IsCUDA(); }
   /**
+   * @brief Is XGBoost running on a MUSA device?
+   */
+  [[nodiscard]] bool IsMUSA() const { return Device().IsMUSA(); }
+  /**
    * @brief Is XGBoost running on the default SYCL device?
    */
   [[nodiscard]] bool IsSyclDefault() const { return Device().IsSyclDefault(); }
@@ -230,6 +246,15 @@ struct Context : public XGBoostParameter<Context> {
   [[nodiscard]] Context MakeCUDA(bst_d_ordinal_t ordinal = 0) const {
     Context ctx = *this;
     return ctx.SetDevice(DeviceOrd::CUDA(ordinal));
+  }
+  /**
+   * @brief Make a MUSA context based on the current context.
+   *
+   * @param ordinal The MUSA device ordinal.
+   */
+  [[nodiscard]] Context MakeMUSA(bst_d_ordinal_t ordinal = 0) const {
+    Context ctx = *this;
+    return ctx.SetDevice(DeviceOrd::MUSA(ordinal));
   }
   /**
    * @brief Make a CPU context based on the current context.

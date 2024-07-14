@@ -96,6 +96,11 @@ constexpr StringView InvalidCUDAOrdinal() {
          "available for using GPU.";
 }
 
+constexpr StringView InvalidMUSAOrdinal() {
+  return "Invalid device. `device` is required to be MUSA and there must be at least one GPU "
+         "available for using GPU.";
+}
+
 void MismatchedDevices(Context const* booster, Context const* data);
 
 inline auto NoFederated() { return "XGBoost is not compiled with federated learning support."; }

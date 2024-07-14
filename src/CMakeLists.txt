@@ -23,7 +23,7 @@ if(USE_MUSA)
 
   file(GLOB_RECURSE MUSA_SOURCES *.mu *.muh)
 
-  set(MUSA_VERBOSE_BUILD ON)
+  set(MUSA_VERBOSE_BUILD OFF)
   set(MUSA_MCC_FLAGS --offload-arch=mp_21 -Werror -D__MUSACC__ -std=c++17 -DXGBOOST_USE_MUSA=1)
   musa_include_directories(${xgboost_SOURCE_DIR}/include)
   musa_include_directories(${xgboost_SOURCE_DIR}/dmlc-core/include)

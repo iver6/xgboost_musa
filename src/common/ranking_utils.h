@@ -156,6 +156,7 @@ class RankingCache {
  private:
   void InitOnCPU(Context const* ctx, MetaInfo const& info);
   void InitOnCUDA(Context const* ctx, MetaInfo const& info);
+  void InitOnMUSA(Context const* ctx, MetaInfo const& info);
   // Cached parameter
   LambdaRankParam param_;
   // offset to data groups.
@@ -184,6 +185,7 @@ class RankingCache {
   HostDeviceVector<std::uint8_t> max_lambdas_;
   // total number of cuda threads used for gradient calculation
   std::size_t n_cuda_threads_{0};
+  std::size_t n_musa_threads_{0};
 
   // Create model rank list on GPU
   common::Span<std::size_t const> MakeRankOnCUDA(Context const* ctx,
@@ -191,6 +193,9 @@ class RankingCache {
   // Create model rank list on CPU
   common::Span<std::size_t const> MakeRankOnCPU(Context const* ctx,
                                                 common::Span<float const> predt);
+  // Create model rank list on GPU
+  common::Span<std::size_t const> MakeRankOnMUSA(Context const* ctx,
+                                                 common::Span<float const> predt);
 
  protected:
   [[nodiscard]] std::size_t MaxGroupSize() const { return max_group_size_; }
@@ -204,7 +209,10 @@ class RankingCache {
     }
     if (ctx->IsCUDA()) {
       this->InitOnCUDA(ctx, info);
-    } else {
+    } else if(ctx->IsMUSA()){
+      this->InitOnMUSA(ctx, info);
+    }
+    else {
       this->InitOnCPU(ctx, info);
     }
     if (!info.weights_.Empty()) {
@@ -223,7 +231,7 @@ class RankingCache {
   // Constructed as [1, n_samples] if group ptr is not supplied by the user
   common::Span<bst_group_t const> DataGroupPtr(Context const* ctx) const {
     group_ptr_.SetDevice(ctx->Device());
-    return ctx->IsCUDA() ? group_ptr_.ConstDeviceSpan() : group_ptr_.ConstHostSpan();
+    return (ctx->IsCUDA() || ctx->IsMUSA() ) ? group_ptr_.ConstDeviceSpan() : group_ptr_.ConstHostSpan();
   }
 
   [[nodiscard]] auto const& Param() const { return param_; }
@@ -238,7 +246,10 @@ class RankingCache {
     }
     if (ctx->IsCUDA()) {
       return this->MakeRankOnCUDA(ctx, predt);
-    } else {
+    } else if(ctx->IsMUSA()){
+      return this->MakeRankOnMUSA(ctx, predt);
+    }
+    else {
       return this->MakeRankOnCPU(ctx, predt);
     }
   }
@@ -246,6 +257,7 @@ class RankingCache {
   // objective for creating pairs.
   common::Span<std::size_t> SortedIdxY(Context const* ctx, std::size_t n_samples) {
     CHECK(ctx->IsCUDA()) << error::InvalidCUDAOrdinal();
+    CHECK(ctx->IsMUSA()) << error::InvalidMUSAOrdinal();
     if (y_sorted_idx_cache_.Empty()) {
       y_sorted_idx_cache_.SetDevice(ctx->Device());
       y_sorted_idx_cache_.Resize(n_samples);
@@ -254,6 +266,7 @@ class RankingCache {
   }
   common::Span<float> RankedY(Context const* ctx, std::size_t n_samples) {
     CHECK(ctx->IsCUDA()) << error::InvalidCUDAOrdinal();
+    CHECK(ctx->IsMUSA()) << error::InvalidMUSAOrdinal();
     if (y_ranked_by_model_.Empty()) {
       y_ranked_by_model_.SetDevice(ctx->Device());
       y_ranked_by_model_.Resize(n_samples);
@@ -283,6 +296,32 @@ class RankingCache {
     }
     return cost_rounding_.DeviceSpan();
   }
+
+
+  // CUDA cache getters, the cache is shared between metric and objective, some of these
+  // fields are lazy initialized to avoid unnecessary allocation.
+  [[nodiscard]] common::Span<std::size_t const> MUSAThreadsGroupPtr() const {
+    CHECK(!threads_group_ptr_.Empty());
+    return threads_group_ptr_.ConstDeviceSpan();
+  }
+  [[nodiscard]] std::size_t MUSAThreads() const { return n_musa_threads_; }
+
+  linalg::VectorView<GradientPair> MUSARounding(Context const* ctx) {
+    if (roundings_.Size() == 0) {
+      roundings_.SetDevice(ctx->Device());
+      roundings_.Reshape(Groups());
+    }
+    return roundings_.View(ctx->Device());
+  }
+  common::Span<double> MUSACostRounding(Context const* ctx) {
+    if (cost_rounding_.Size() == 0) {
+      cost_rounding_.SetDevice(ctx->Device());
+      cost_rounding_.Resize(1);
+    }
+    return cost_rounding_.DeviceSpan();
+  }
+
+
   template <typename Type>
   common::Span<Type> MaxLambdas(Context const* ctx, std::size_t n) {
     max_lambdas_.SetDevice(ctx->Device());
@@ -308,13 +347,17 @@ class NDCGCache : public RankingCache {
  public:
   void InitOnCPU(Context const* ctx, MetaInfo const& info);
   void InitOnCUDA(Context const* ctx, MetaInfo const& info);
+  void InitOnMUSA(Context const* ctx, MetaInfo const& info);
 
  public:
   NDCGCache(Context const* ctx, MetaInfo const& info, LambdaRankParam const& p)
       : RankingCache{ctx, info, p} {
     if (ctx->IsCUDA()) {
       this->InitOnCUDA(ctx, info);
-    } else {
+    } else if(ctx->IsMUSA()){
+      this->InitOnMUSA(ctx, info);
+    }
+    else {
       this->InitOnCPU(ctx, info);
     }
   }
@@ -323,7 +366,7 @@ class NDCGCache : public RankingCache {
     return inv_idcg_.View(ctx->Device());
   }
   common::Span<double const> Discount(Context const* ctx) const {
-    return ctx->IsCUDA() ? discounts_.ConstDeviceSpan() : discounts_.ConstHostSpan();
+    return (ctx->IsCUDA() || ctx->IsMUSA()) ? discounts_.ConstDeviceSpan() : discounts_.ConstHostSpan();
   }
   linalg::VectorView<double> Dcg(Context const* ctx) {
     if (dcg_.Size() == 0) {
@@ -388,13 +431,17 @@ class PreCache : public RankingCache {
 
   void InitOnCPU(Context const* ctx, MetaInfo const& info);
   void InitOnCUDA(Context const* ctx, MetaInfo const& info);
+  void InitOnMUSA(Context const* ctx, MetaInfo const& info);
 
  public:
   PreCache(Context const* ctx, MetaInfo const& info, LambdaRankParam const& p)
       : RankingCache{ctx, info, p} {
     if (ctx->IsCUDA()) {
       this->InitOnCUDA(ctx, info);
-    } else {
+    } else if(ctx->IsMUSA()){
+      this->InitOnMUSA(ctx, info);
+    } 
+    else {
       this->InitOnCPU(ctx, info);
     }
   }
@@ -404,7 +451,7 @@ class PreCache : public RankingCache {
       pre_.SetDevice(ctx->Device());
       pre_.Resize(this->Groups());
     }
-    return ctx->IsCUDA() ? pre_.DeviceSpan() : pre_.HostSpan();
+    return (ctx->IsCUDA() || ctx->IsMUSA())? pre_.DeviceSpan() : pre_.HostSpan();
   }
 };
 
@@ -419,13 +466,17 @@ class MAPCache : public RankingCache {
 
   void InitOnCPU(Context const* ctx, MetaInfo const& info);
   void InitOnCUDA(Context const* ctx, MetaInfo const& info);
+  void InitOnMUSA(Context const* ctx, MetaInfo const& info);
 
  public:
   MAPCache(Context const* ctx, MetaInfo const& info, LambdaRankParam const& p)
       : RankingCache{ctx, info, p}, n_samples_{static_cast<std::size_t>(info.num_row_)} {
     if (ctx->IsCUDA()) {
       this->InitOnCUDA(ctx, info);
-    } else {
+    } else if(ctx->IsMUSA()){
+      this->InitOnMUSA(ctx, info);
+    }
+    else {
       this->InitOnCPU(ctx, info);
     }
   }
@@ -435,21 +486,21 @@ class MAPCache : public RankingCache {
       n_rel_.SetDevice(ctx->Device());
       n_rel_.Resize(n_samples_);
     }
-    return ctx->IsCUDA() ? n_rel_.DeviceSpan() : n_rel_.HostSpan();
+    return (ctx->IsCUDA() || ctx->IsMUSA()) ? n_rel_.DeviceSpan() : n_rel_.HostSpan();
   }
   common::Span<double> Acc(Context const* ctx) {
     if (acc_.Empty()) {
       acc_.SetDevice(ctx->Device());
       acc_.Resize(n_samples_);
     }
-    return ctx->IsCUDA() ? acc_.DeviceSpan() : acc_.HostSpan();
+    return (ctx->IsCUDA() || ctx->IsMUSA()) ? acc_.DeviceSpan() : acc_.HostSpan();
   }
   common::Span<double> Map(Context const* ctx) {
     if (map_.Empty()) {
       map_.SetDevice(ctx->Device());
       map_.Resize(this->Groups());
     }
-    return ctx->IsCUDA() ? map_.DeviceSpan() : map_.HostSpan();
+    return (ctx->IsCUDA() || ctx->IsMUSA()) ? map_.DeviceSpan() : map_.HostSpan();
   }
 };
 
