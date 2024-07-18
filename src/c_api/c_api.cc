@@ -47,6 +47,9 @@
 
 using namespace xgboost; // NOLINT(*);
 
+
+
+
 XGB_DLL void XGBoostVersion(int* major, int* minor, int* patch) {
   if (major) {
     *major = XGBOOST_VER_MAJOR;

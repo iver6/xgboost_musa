@@ -11,3 +11,11 @@ void ArrayInterfaceHandler::SyncCudaStream(int64_t) { common::AssertGPUSupport()
 bool ArrayInterfaceHandler::IsCudaPtr(void const *) { return false; }
 #endif  // !defined(XGBOOST_USE_CUDA)
 }  // namespace xgboost
+
+
+namespace xgboost {
+#if !defined(XGBOOST_USE_MUSA)
+void ArrayInterfaceHandler::SyncMUSAStream(int64_t) { common::AssertGPUSupport(); }
+bool ArrayInterfaceHandler::IsMUSAPtr(void const *) { return false; }
+#endif  // !defined(XGBOOST_USE_CUDA)
+}  // namespace xgboost

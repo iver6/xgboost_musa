@@ -27,6 +27,10 @@
 #include "cuda_fp16.h"  // for __half
 #endif
 
+#if defined(XGBOOST_USE_MUSA)
+#include "musa_fp16.h"  // for __half
+#endif
+
 namespace xgboost {
 // Common errors in parsing columnar format.
 struct ArrayInterfaceErrors {
@@ -310,6 +314,14 @@ class ArrayInterfaceHandler {
    * \brief Sync the CUDA stream.
    */
   static void SyncCudaStream(int64_t stream);
+    /**
+   * \brief Whether the ptr is allocated by CUDA.
+   */
+  static bool IsMUSAPtr(void const *ptr);
+  /**
+   * \brief Sync the CUDA stream.
+   */
+  static void SyncMUSAStream(int64_t stream);
 };
 
 /**
@@ -319,6 +331,12 @@ template <typename T, typename E = void>
 struct ToDType;
 // float
 #if defined(XGBOOST_USE_CUDA)
+template <>
+struct ToDType<__half> {
+  static constexpr ArrayInterfaceHandler::Type kType = ArrayInterfaceHandler::kF2;
+};
+#endif  // defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_MUSA)
 template <>
 struct ToDType<__half> {
   static constexpr ArrayInterfaceHandler::Type kType = ArrayInterfaceHandler::kF2;
@@ -439,7 +457,11 @@ class ArrayInterface {
     auto stream_it = array.find("stream");
     if (stream_it != array.cend() && !IsA<Null>(stream_it->second)) {
       int64_t stream = get<Integer const>(stream_it->second);
+      #if defined(XGBOOST_USE_MUSA)
+      ArrayInterfaceHandler::SyncMUSAStream(stream);
+      #else
       ArrayInterfaceHandler::SyncCudaStream(stream);
+      #endif
     }
   }
 
@@ -470,7 +492,7 @@ class ArrayInterface {
       CHECK(sizeof(long double) == 16) << error::NoF128();
       type = T::kF16;
     } else if (typestr[1] == 'f' && typestr[2] == '2') {
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_MUSA)
       type = T::kF2;
 #else
       LOG(FATAL) << "Half type is not supported.";
@@ -509,7 +531,7 @@ class ArrayInterface {
     using T = ArrayInterfaceHandler::Type;
     switch (type) {
       case T::kF2: {
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_MUSA)
         return func(reinterpret_cast<__half const *>(data));
 #endif  // defined(XGBOOST_USE_CUDA)
       }
@@ -518,6 +540,12 @@ class ArrayInterface {
       case T::kF8:
         return func(reinterpret_cast<double const *>(data));
 #ifdef __CUDA_ARCH__
+      case T::kF16: {
+        // CUDA device code doesn't support long double.
+        SPAN_CHECK(false);
+        return func(reinterpret_cast<double const *>(data));
+      }
+#elif defined(XGBOOST_USE_MUSA)
       case T::kF16: {
         // CUDA device code doesn't support long double.
         SPAN_CHECK(false);
@@ -572,6 +600,14 @@ class ArrayInterface {
               std::is_same<std::size_t, std::remove_cv_t<T>>::value,
           unsigned long long, T>;  // NOLINT
       return static_cast<T>(static_cast<Type>(p_values[offset]));
+#elif defined(XGBOOST_USE_MUSA)
+      // No operator defined for half -> size_t
+      using Type = std::conditional_t<
+          std::is_same<__half,
+                       std::remove_cv_t<std::remove_pointer_t<decltype(p_values)>>>::value &&
+              std::is_same<std::size_t, std::remove_cv_t<T>>::value,
+          unsigned long long, T>;  // NOLINT
+      return static_cast<T>(static_cast<Type>(p_values[offset]));
 #else
       return static_cast<T>(p_values[offset]);
 #endif  // defined(XGBOOST_USE_CUDA)
@@ -598,7 +634,7 @@ template <typename Fn>
 auto DispatchDType(ArrayInterfaceHandler::Type dtype, Fn dispatch) {
   switch (dtype) {
     case ArrayInterfaceHandler::kF2: {
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_MUSA)
       return dispatch(__half{});
 #else
       LOG(FATAL) << "half type is only supported for CUDA input.";

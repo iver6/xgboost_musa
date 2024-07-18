@@ -803,6 +803,10 @@ void MetaInfo::Validate(DeviceOrd device) const {
 void MetaInfo::SetInfoFromCUDA(Context const&, StringView, Json) { common::AssertGPUSupport(); }
 #endif  // !defined(XGBOOST_USE_CUDA)
 
+#if !defined(XGBOOST_USE_MUSA)
+void MetaInfo::SetInfoFromMUSA(Context const&, StringView, Json) { common::AssertGPUSupport(); }
+#endif  // !defined(XGBOOST_USE_CUDA)
+
 bool MetaInfo::IsVerticalFederated() const {
   return collective::IsFederated() && IsColumnSplit();
 }
