@@ -17,21 +17,14 @@ endif()
 
 if(USE_MUSA)
 
-  set_source_files_properties(${xgboost_SOURCE_DIR}/src/c_api/c_api.cc
-  PROPERTIES
-  MUSA_SOURCE_PROPERTY_FORMAT OBJ
-  )
-
   list(APPEND CMAKE_MODULE_PATH /usr/local/musa/cmake) 
   
   find_package(MUSA REQUIRED)
 
   file(GLOB_RECURSE MUSA_SOURCES *.mu *.muh)
-  list(APPEND MUSA_SOURCES ${xgboost_SOURCE_DIR}/src/c_api/c_api.cc)
-  list(REMOVE_ITEM CPU_SOURCES ${xgboost_SOURCE_DIR}/src/c_api/c_api.cc)
 
-  set(MUSA_VERBOSE_BUILD ON)
-  set(MUSA_MCC_FLAGS --offload-arch=mp_21 -Werror -D__MUSACC__  -std=c++11 -DXGBOOST_USE_MUSA=1)
+  set(MUSA_VERBOSE_BUILD OFF)
+  set(MUSA_MCC_FLAGS --offload-arch=mp_21 -Werror -D__MUSACC__  -std=c++17 -DXGBOOST_USE_MUSA=1)
   musa_include_directories(${xgboost_SOURCE_DIR}/include)
   musa_include_directories(${xgboost_SOURCE_DIR}/dmlc-core/include)
 

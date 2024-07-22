@@ -28,7 +28,7 @@
 #endif
 
 #if defined(XGBOOST_USE_MUSA)
-#include "musa_fp16.h"  // for __half
+#include "musa_fp16_.h"  // for __half
 #endif
 
 namespace xgboost {

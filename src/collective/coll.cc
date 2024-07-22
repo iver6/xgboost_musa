@@ -21,10 +21,15 @@
 #include "cuda_fp16.h"  // for __half
 #endif
 
+
+#if defined(XGBOOST_USE_MUSA)
+#include "musa_fp16_.h"  // for __half
+#endif
+
 namespace xgboost::collective {
 template <typename T>
 bool constexpr IsFloatingPointV() {
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_MUSA)
   return std::is_floating_point_v<T> || std::is_same_v<T, __half>;
 #else
   return std::is_floating_point_v<T>;
