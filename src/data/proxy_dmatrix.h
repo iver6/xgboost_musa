@@ -45,6 +45,13 @@ class DMatrixProxy : public DMatrix {
   void FromCudaArray(StringView interface_str);
 #endif  // defined(XGBOOST_USE_CUDA)
 
+
+#if defined(XGBOOST_USE_MUSA)
+  void FromMUSAColumnar(StringView interface_str);
+  void FromMUSAArray(StringView interface_str);
+#endif  // defined(XGBOOST_USE_CUDA)
+
+
  public:
   DeviceOrd Device() const { return ctx_.Device(); }
 

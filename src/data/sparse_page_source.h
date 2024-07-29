@@ -15,7 +15,7 @@
 #include <utility>    // for pair, move
 #include <vector>     // for vector
 
-#if !defined(XGBOOST_USE_CUDA)
+#if !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_MUSA)
 #include "../common/common.h"  // for AssertGPUSupport
 #endif                         // !defined(XGBOOST_USE_CUDA)
 
@@ -358,7 +358,7 @@ class SparsePageSourceImpl : public BatchIteratorImpl<S>, public FormatStreamPol
   }
 };
 
-#if defined(XGBOOST_USE_CUDA)
+#if defined(XGBOOST_USE_CUDA) || defined(XGBOOST_USE_MUSA)
 // Push data from CUDA.
 void DevicePush(DMatrixProxy* proxy, float missing, SparsePage* page);
 #else

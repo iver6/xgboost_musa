@@ -68,6 +68,9 @@ class IterativeDMatrix : public DMatrix {
     return BatchSet<Page>(BatchIterator<Page>(nullptr));
   }
 
+  void InitFromMUSA(Context const *ctx, BatchParam const &p, DataIterHandle iter_handle,
+                    float missing, std::shared_ptr<DMatrix> ref);
+
   void InitFromCUDA(Context const *ctx, BatchParam const &p, DataIterHandle iter_handle,
                     float missing, std::shared_ptr<DMatrix> ref);
   void InitFromCPU(Context const *ctx, BatchParam const &p, DataIterHandle iter_handle,
