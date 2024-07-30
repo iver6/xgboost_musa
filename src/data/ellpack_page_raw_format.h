@@ -11,7 +11,7 @@
 #include "sparse_page_writer.h"  // for SparsePageFormat
 #include "xgboost/data.h"        // for EllpackPage
 
-#if !defined(XGBOOST_USE_CUDA)
+#if !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_MUSA)
 #include "../common/common.h"  // for AssertGPUSupport
 #endif                         // !defined(XGBOOST_USE_CUDA)`
 
@@ -38,7 +38,7 @@ class EllpackPageRawFormat : public SparsePageFormat<EllpackPage> {
   [[nodiscard]] std::size_t Write(const EllpackPage& page, EllpackHostCacheStream* fo) const;
 };
 
-#if !defined(XGBOOST_USE_CUDA)
+#if !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_MUSA)
 inline bool EllpackPageRawFormat::Read(EllpackPage*, common::AlignedResourceReadStream*) {
   common::AssertGPUSupport();
   return false;

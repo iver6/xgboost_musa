@@ -89,5 +89,8 @@ class pinned_allocator {
   }
 };
 }  // namespace cuda
+
+
+
 }  // namespace common
 }  // namespace xgboost

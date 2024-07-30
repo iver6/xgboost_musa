@@ -73,7 +73,11 @@ class EllpackFormatPolicy {
   void SetCuts(std::shared_ptr<common::HistogramCuts const> cuts, DeviceOrd device) {
     std::swap(cuts_, cuts);
     device_ = device;
+    #if defined(XGBOOST_USE_CUDA)
     CHECK(this->device_.IsCUDA());
+    #else
+    CHECK(this->device_.IsMUSA());
+    #endif
   }
   [[nodiscard]] auto GetCuts() {
     CHECK(cuts_);
@@ -134,7 +138,7 @@ using EllpackPageHostSource =
 using EllpackPageSource =
     EllpackPageSourceImpl<DefaultFormatStreamPolicy<EllpackPage, EllpackFormatPolicy>>;
 
-#if !defined(XGBOOST_USE_CUDA)
+#if !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_MUSA)
 template <typename F>
 inline void EllpackPageSourceImpl<F>::Fetch() {
   // silent the warning about unused variables.

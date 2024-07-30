@@ -1,7 +1,7 @@
 /**
  * Copyright 2019-2024, XGBoost contributors
  */
-#ifndef XGBOOST_USE_CUDA
+#if !defined(XGBOOST_USE_CUDA) && !defined(XGBOOST_USE_MUSA)
 
 #include "ellpack_page.h"
 
